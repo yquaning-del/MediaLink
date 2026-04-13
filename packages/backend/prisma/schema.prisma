@@ -1,0 +1,504 @@
+// MediaLink Ghana — Prisma Schema
+// PostgreSQL primary store
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum Role {
+  APPLICANT
+  EMPLOYER
+  FINANCE
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  PENDING      // awaiting OTP verification / payment
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum IndustryType {
+  TV
+  RADIO
+  DIGITAL
+  PRINT
+  OUTDOOR
+  EVENTS
+  INFLUENCER_MARKETING
+}
+
+enum KybStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SubscriptionTier {
+  FREE
+  BASIC
+  PREMIUM
+  ENTERPRISE
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  COMMISSION_BASED
+}
+
+enum JobStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  CLOSED
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SHORTLISTED
+  INTERVIEWED
+  OFFER_MADE
+  HIRED
+  REJECTED
+}
+
+enum PlacementStatus {
+  ACTIVE
+  COMPLETED
+  TERMINATED
+  DISPUTED
+}
+
+enum PaymentType {
+  REGISTRATION
+  REVENUE_SHARE
+  SUBSCRIPTION
+  JOB_BOOST
+  BACKGROUND_CHECK
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum NotifChannel {
+  SMS
+  EMAIL
+  IN_APP
+}
+
+// ─────────────────────────────────────────────
+// USER (unified auth table)
+// ─────────────────────────────────────────────
+
+model User {
+  id              String     @id @default(uuid())
+  email           String     @unique
+  phone           String     @unique   // Ghanaian format: 0XX-XXXXXXX
+  passwordHash    String
+  role            Role       @default(APPLICANT)
+  status          UserStatus @default(PENDING)
+  twoFAEnabled    Boolean    @default(false)
+  twoFASecret     String?
+  lastLoginAt     DateTime?
+  failedLoginCount Int       @default(0)
+  lockedUntil     DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  applicantProfile  ApplicantProfile?
+  mediaHouse        MediaHouse?
+  sentMessages      Message[]          @relation("SentMessages")
+  receivedMessages  Message[]          @relation("ReceivedMessages")
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  payments          Payment[]
+  referralsMade     Referral[]         @relation("Referrer")
+  referralReceived  Referral?          @relation("Referee")
+
+  @@index([email])
+  @@index([phone])
+  @@index([role, status])
+}
+
+// Short-lived OTP codes (also cached in Redis)
+model OtpCode {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String
+  purpose   String   @default("REGISTRATION") // REGISTRATION | LOGIN | PASSWORD_RESET
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([phone, used])
+}
+
+// ─────────────────────────────────────────────
+// APPLICANT PROFILE
+// ─────────────────────────────────────────────
+
+model ApplicantProfile {
+  id                  String    @id @default(uuid())
+  userId              String    @unique
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName            String
+  dateOfBirth         DateTime?
+  gender              String?
+  ghanaCardNumber     String?   @unique
+  profilePhotoUrl     String?
+  address             String?
+  district            String?
+  region              String?
+  professionalSummary String?   // 200–500 chars
+
+  // Arrays (PostgreSQL native arrays)
+  skills              String[]  // from skills taxonomy
+  preferredJobTypes   JobType[]
+  preferredRegions    String[]
+
+  // Salary expectations (GHC)
+  salaryMin           Decimal?  @db.Decimal(12, 2)
+  salaryMax           Decimal?  @db.Decimal(12, 2)
+
+  cvUrl               String?
+  completionScore     Int       @default(0) // 0–100; <60 hidden from employer search
+
+  // Referral
+  referralCode        String?   @unique
+  referredBy          String?
+
+  workExperiences     WorkExperience[]
+  educations          Education[]
+  applications        Application[]
+  placements          Placement[]
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([completionScore])
+  @@index([region])
+}
+
+model WorkExperience {
+  id               String           @id @default(uuid())
+  profileId        String
+  profile          ApplicantProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  companyName      String
+  role             String
+  startDate        DateTime
+  endDate          DateTime?
+  isCurrent        Boolean          @default(false)
+  responsibilities String?
+  createdAt        DateTime         @default(now())
+}
+
+model Education {
+  id              String           @id @default(uuid())
+  profileId       String
+  profile         ApplicantProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  institution     String
+  qualification   String
+  graduationYear  Int
+  createdAt       DateTime         @default(now())
+}
+
+// ─────────────────────────────────────────────
+// MEDIA HOUSE (EMPLOYER)
+// ─────────────────────────────────────────────
+
+model MediaHouse {
+  id                 String           @id @default(uuid())
+  userId             String           @unique
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName        String
+  registrationNumber String           @unique
+  industryType       IndustryType
+  email              String
+  phone              String
+  address            String
+  logoUrl            String?
+  website            String?
+  verified           Boolean          @default(false)
+  kybStatus          KybStatus        @default(PENDING)
+  kybNotes           String?          // Admin notes on KYB review
+  subscriptionTier   SubscriptionTier @default(FREE)
+  subscriptionExpiry DateTime?
+  jobListings        JobListing[]
+  payments           Payment[]        @relation("MediaHousePayments")
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([kybStatus])
+  @@index([verified])
+}
+
+// ─────────────────────────────────────────────
+// JOB LISTINGS
+// ─────────────────────────────────────────────
+
+model JobListing {
+  id                  String      @id @default(uuid())
+  employerId          String
+  employer            MediaHouse  @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  title               String
+  department          String?
+  jobType             JobType
+  location            String      // City
+  region              String      // Ghana region
+  remoteEligible      Boolean     @default(false)
+  description         String      // HTML rich text, sanitised, max 3000 chars
+  requiredSkills      String[]
+  minExperienceYears  Int         @default(0)
+  minEducationLevel   String?
+  salaryMin           Decimal?    @db.Decimal(12, 2) // GHC
+  salaryMax           Decimal?    @db.Decimal(12, 2) // GHC
+  applicationDeadline DateTime?
+  numberOfOpenings    Int         @default(1)
+  status              JobStatus   @default(DRAFT)
+  isFeatured          Boolean     @default(false)
+  boostExpiry         DateTime?
+  viewCount           Int         @default(0)
+  applications        Application[]
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  expiresAt           DateTime?
+
+  @@index([status, region])
+  @@index([status, isFeatured])
+  @@index([employerId])
+}
+
+// ─────────────────────────────────────────────
+// APPLICATIONS
+// ─────────────────────────────────────────────
+
+model Application {
+  id          String            @id @default(uuid())
+  jobId       String
+  job         JobListing        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  applicantId String
+  applicant   ApplicantProfile  @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  status      ApplicationStatus @default(APPLIED)
+  coverNote   String?           // max 500 chars
+  matchScore  Float?            // 0–100
+  appliedAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  placement   Placement?
+
+  @@unique([jobId, applicantId])
+  @@index([applicantId, status])
+  @@index([jobId, status])
+}
+
+// ─────────────────────────────────────────────
+// PLACEMENTS
+// ─────────────────────────────────────────────
+
+model Placement {
+  id                    String          @id @default(uuid())
+  applicationId         String          @unique
+  application           Application     @relation(fields: [applicationId], references: [id])
+  applicantId           String
+  applicant             ApplicantProfile @relation(fields: [applicantId], references: [id])
+  startDate             DateTime
+  salaryAgreed          Decimal         @db.Decimal(12, 2) // GHC gross monthly
+  revenueShareRate      Decimal         @default(0.05) @db.Decimal(5, 4) // 3–5%
+  monthsRemaining       Int             @default(6)
+  monthsCompleted       Int             @default(0)
+  status                PlacementStatus @default(ACTIVE)
+  contractUrl           String?         // S3 presigned URL
+  applicantSigned       Boolean         @default(false)
+  employerSigned        Boolean         @default(false)
+  applicantSignedAt     DateTime?
+  employerSignedAt      DateTime?
+  payments              Payment[]
+  revenueShareSchedules RevenueShareSchedule[]
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  @@index([status, applicantId])
+}
+
+model RevenueShareSchedule {
+  id            String        @id @default(uuid())
+  placementId   String
+  placement     Placement     @relation(fields: [placementId], references: [id], onDelete: Cascade)
+  monthNumber   Int           // 1–6
+  dueDate       DateTime
+  amount        Decimal       @db.Decimal(12, 2) // GHC
+  status        PaymentStatus @default(PENDING)
+  remindersSent Int           @default(0)
+  lastReminderAt DateTime?
+  paymentId     String?       @unique
+  payment       Payment?      @relation(fields: [paymentId], references: [id])
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([placementId, monthNumber])
+  @@index([status, dueDate])
+}
+
+// ─────────────────────────────────────────────
+// PAYMENTS
+// ─────────────────────────────────────────────
+
+model Payment {
+  id              String        @id @default(uuid())
+  payerId         String
+  payer           User          @relation(fields: [payerId], references: [id])
+  mediaHouseId    String?
+  mediaHouse      MediaHouse?   @relation("MediaHousePayments", fields: [mediaHouseId], references: [id])
+  placementId     String?
+  placement       Placement?    @relation(fields: [placementId], references: [id])
+  type            PaymentType
+  amount          Decimal       @db.Decimal(12, 2) // GHC
+  gatewayRef      String?       @unique  // Paystack/Flutterwave reference
+  gateway         String        @default("PAYSTACK") // PAYSTACK | FLUTTERWAVE
+  status          PaymentStatus @default(PENDING)
+  channel         String?       // momo_mtn | momo_vodafone | momo_airteltigo | card | bank
+  receiptUrl      String?       // S3 URL for PDF receipt
+  dueDate         DateTime?
+  paidAt          DateTime?
+  metadata        Json?
+  revenueSchedule RevenueShareSchedule?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([payerId, type])
+  @@index([status, type])
+  @@index([gatewayRef])
+}
+
+// ─────────────────────────────────────────────
+// MESSAGING
+// ─────────────────────────────────────────────
+
+model Message {
+  id          String   @id @default(uuid())
+  senderId    String
+  sender      User     @relation("SentMessages", fields: [senderId], references: [id])
+  recipientId String
+  recipient   User     @relation("ReceivedMessages", fields: [recipientId], references: [id])
+  subject     String?
+  body        String
+  read        Boolean  @default(false)
+  sentAt      DateTime @default(now())
+  readAt      DateTime?
+
+  @@index([recipientId, read])
+  @@index([senderId])
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────
+
+model Notification {
+  id          String       @id @default(uuid())
+  recipientId String
+  recipient   User         @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  channel     NotifChannel
+  type        String       // JOB_MATCH | PAYMENT_DUE | etc.
+  content     String
+  metadata    Json?
+  sentAt      DateTime     @default(now())
+  readAt      DateTime?
+
+  @@index([recipientId, readAt])
+  @@index([type])
+}
+
+// ─────────────────────────────────────────────
+// AUDIT LOG (immutable — never updated or deleted)
+// ─────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String   // LOGIN | LOGOUT | PAYMENT | PROFILE_UPDATE | PLACEMENT_CONFIRM | etc.
+  entity    String?  // table name: User | Placement | Payment | etc.
+  entityId  String?
+  oldValue  Json?
+  newValue  Json?
+  metadata  Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@index([entity, entityId])
+}
+
+// ─────────────────────────────────────────────
+// REFERRALS (Phase 3)
+// ─────────────────────────────────────────────
+
+model Referral {
+  id          String   @id @default(uuid())
+  referrerId  String
+  referrer    User     @relation("Referrer", fields: [referrerId], references: [id])
+  refereeId   String   @unique
+  referee     User     @relation("Referee", fields: [refereeId], references: [id])
+  status      String   @default("PENDING") // PENDING | PLACED | REWARDED
+  rewardPaid  Boolean  @default(false)
+  rewardAmount Decimal? @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// SKILLS TAXONOMY (Admin-managed)
+// ─────────────────────────────────────────────
+
+model Skill {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  category  String   // Sales | Advertising | Digital Marketing | Soft Skills
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────
+// PLATFORM CONFIG (Admin-managed key-value store)
+// ─────────────────────────────────────────────
+
+model PlatformConfig {
+  key       String   @id
+  value     String
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// SAVED JOB SEARCHES (Phase 3)
+// ─────────────────────────────────────────────
+
+model SavedSearch {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  filters   Json     // { skills, region, jobType, salaryMin, salaryMax }
+  alertsEnabled Boolean @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
