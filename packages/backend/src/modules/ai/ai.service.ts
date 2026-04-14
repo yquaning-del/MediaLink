@@ -43,7 +43,7 @@ export async function getProfileCoachSuggestions(userId: string) {
     where: { id: userId },
     include: {
       applicantProfile: {
-        include: { skills: true, workExperiences: true, educations: true },
+        include: { workExperiences: true, educations: true },
       },
     },
   });
@@ -51,14 +51,14 @@ export async function getProfileCoachSuggestions(userId: string) {
   if (!user?.applicantProfile) throw new AppError('Applicant profile not found', 404);
 
   const profile = user.applicantProfile;
-  const skillNames = profile.skills.map((s: { name: string }) => s.name).join(', ') || 'none listed';
+  const skillNames = profile.skills?.length ? profile.skills.join(', ') : 'none listed';
   const experienceYears = profile.workExperiences.length;
   const educationCount = profile.educations.length;
 
   const userPrompt = `
 Applicant Profile:
 - Name: ${profile.fullName}
-- Bio: ${profile.bio || 'empty'}
+- Bio: ${profile.professionalSummary || 'empty'}
 - Region: ${profile.region || 'not set'}
 - Skills: ${skillNames}
 - Work experiences: ${experienceYears} entries
@@ -136,7 +136,6 @@ export async function summarizeCandidateForJob(userId: string, applicationId: st
       applicant: {
         include: {
           user: { select: { email: true } },
-          skills: true,
           workExperiences: true,
           educations: true,
         },
@@ -150,9 +149,9 @@ export async function summarizeCandidateForJob(userId: string, applicationId: st
   }
 
   const candidate = application.applicant;
-  const skills = candidate.skills.map((s: { name: string }) => s.name).join(', ');
+  const skills = candidate.skills?.length ? candidate.skills.join(', ') : 'none listed';
   const experience = candidate.workExperiences
-    .map((w: { title: string; companyName: string }) => `${w.title} at ${w.companyName}`)
+    .map((w) => `${w.role} at ${w.companyName}`)
     .join('; ');
 
   const userPrompt = `
@@ -163,8 +162,8 @@ Min Experience: ${application.job.minExperienceYears} years
 Candidate: ${candidate.fullName}
 Skills: ${skills}
 Experience: ${experience || 'none listed'}
-Education: ${candidate.educations.map((e: { degree: string; institution: string }) => `${e.degree} from ${e.institution}`).join('; ') || 'none listed'}
-Cover Letter: ${application.coverLetter || 'not provided'}
+Education: ${candidate.educations.map((e) => `${e.qualification} from ${e.institution}`).join('; ') || 'none listed'}
+Cover letter: ${application.coverNote || 'not provided'}
 
 Provide a 2-3 sentence AI summary of this candidate's fit for the specific role, highlighting strengths and any gaps. Return as JSON with "summary", "strengths" (array), "gaps" (array), and "fitScore" (0-100).`;
 
@@ -195,8 +194,12 @@ export async function getSalaryInsights(params: {
   const placements = await prisma.placement.findMany({
     where: { status: { in: ['ACTIVE', 'COMPLETED'] } },
     include: {
-      job: {
-        select: { title: true, region: true, jobType: true, salaryMin: true, salaryMax: true },
+      application: {
+        include: {
+          job: {
+            select: { title: true, region: true, jobType: true, salaryMin: true, salaryMax: true },
+          },
+        },
       },
     },
     take: 200,

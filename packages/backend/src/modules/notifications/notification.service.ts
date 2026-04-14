@@ -1,11 +1,10 @@
-import axios from 'axios';
 import sgMail from '@sendgrid/mail';
 import twilio from 'twilio';
 import { env } from '../../config/env';
 import { prisma } from '../../config/database';
 import { toInternationalFormat } from '../../utils/phoneFormat';
 import { logger } from '../../config/logger';
-import { NotifChannel } from '@prisma/client';
+import { NotifChannel, Prisma } from '@prisma/client';
 
 sgMail.setApiKey(env.SENDGRID_API_KEY);
 
@@ -87,9 +86,9 @@ export async function notify(params: NotifyParams): Promise<void> {
   for (const channel of params.channels) {
     if (channel === 'SMS' && params.recipientPhone && params.smsMessage) {
       promises.push(
-        sendSms(params.recipientPhone, params.smsMessage).catch((e) =>
-          logger.error('SMS notify failed', e)
-        )
+        sendSms(params.recipientPhone, params.smsMessage).catch((e) => {
+          logger.error('SMS notify failed', e);
+        })
       );
     }
 
@@ -100,7 +99,9 @@ export async function notify(params: NotifyParams): Promise<void> {
           subject: params.emailSubject,
           html: params.emailHtml,
           attachments: params.emailAttachments,
-        }).catch((e) => logger.error('Email notify failed', e))
+        }).catch((e) => {
+          logger.error('Email notify failed', e);
+        })
       );
     }
   }
@@ -114,11 +115,13 @@ export async function notify(params: NotifyParams): Promise<void> {
           channel: 'IN_APP',
           type: params.type,
           content: params.smsMessage || params.emailSubject || params.type,
-          metadata: params.metadata || {},
+          metadata: (params.metadata ?? {}) as Prisma.InputJsonValue,
         },
       })
       .then(() => undefined)
-      .catch((e) => logger.error('In-app notification save failed', e))
+      .catch((e) => {
+        logger.error('In-app notification save failed', e);
+      })
   );
 
   await Promise.allSettled(promises);

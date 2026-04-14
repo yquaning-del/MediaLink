@@ -92,7 +92,9 @@ async function processJobMatching(jobId: string): Promise<void> {
             jobUrl
           ),
           metadata: { jobId, matchScore: score },
-        }).catch((err) => logger.error('Match notification failed', err))
+        }).catch((err) => {
+          logger.error('Match notification failed', err);
+        })
       );
     }
   }

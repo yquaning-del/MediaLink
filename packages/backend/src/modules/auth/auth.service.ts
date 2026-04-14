@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { type SignOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
 import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
@@ -27,12 +27,12 @@ function generateTokens(userId: string, email: string, role: Role) {
   const accessToken = jwt.sign(
     { sub: userId, email, role, jti } as JwtPayload,
     env.JWT_SECRET,
-    { expiresIn: env.JWT_ACCESS_EXPIRY }
+    { expiresIn: env.JWT_ACCESS_EXPIRY } as SignOptions
   );
   const refreshToken = jwt.sign(
     { sub: userId, email, role, jti: uuidv4() } as JwtPayload,
     env.JWT_REFRESH_SECRET,
-    { expiresIn: env.JWT_REFRESH_EXPIRY }
+    { expiresIn: env.JWT_REFRESH_EXPIRY } as SignOptions
   );
   return { accessToken, refreshToken, jti };
 }
