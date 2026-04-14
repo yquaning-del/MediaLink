@@ -25,7 +25,9 @@ export function getPaginationParams(query: Record<string, unknown>): {
   limit: number;
   skip: number;
 } {
-  const page = Math.max(1, parseInt(String(query.page || '1'), 10));
-  const limit = Math.min(100, Math.max(1, parseInt(String(query.limit || '20'), 10)));
+  const rawPage = parseInt(String(query.page || '1'), 10);
+  const rawLimit = parseInt(String(query.limit || '20'), 10);
+  const page = Math.max(1, isNaN(rawPage) ? 1 : rawPage);
+  const limit = Math.min(100, Math.max(1, isNaN(rawLimit) ? 20 : rawLimit));
   return { page, limit, skip: (page - 1) * limit };
 }

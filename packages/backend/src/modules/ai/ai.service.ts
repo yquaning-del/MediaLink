@@ -3,9 +3,9 @@ import { AppError } from '../../middleware/error.middleware';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
 
-const AI_API_URL = process.env.AI_API_URL || 'https://api.openai.com/v1';
-const AI_API_KEY = process.env.AI_API_KEY || '';
-const AI_MODEL = process.env.AI_MODEL || 'gpt-4o-mini';
+const AI_API_URL = env.AI_API_URL;
+const AI_API_KEY = env.AI_API_KEY;
+const AI_MODEL = env.AI_MODEL;
 
 async function callAI(systemPrompt: string, userPrompt: string, maxTokens = 500): Promise<string> {
   if (!AI_API_KEY) {

@@ -51,6 +51,9 @@ const envSchema = z.object({
   REVENUE_SHARE_MONTHS: z.coerce.number().default(6),
   GHANA_CARD_API_URL: z.string().default(''),
   GHANA_CARD_API_KEY: z.string().default(''),
+  AI_API_URL: z.string().default('https://api.openai.com/v1'),
+  AI_API_KEY: z.string().default(''),
+  AI_MODEL: z.string().default('gpt-4o-mini'),
   CORS_ORIGINS: z.string().default(''),
 });
 
