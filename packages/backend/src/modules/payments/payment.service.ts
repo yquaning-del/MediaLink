@@ -65,7 +65,7 @@ export async function initiateRegistrationFee(userId: string) {
 
   const paystackData = await paystackPost('/transaction/initialize', {
     email: user.email,
-    amount: env.REGISTRATION_FEE_KOBO, // 5000 kobo = GHC 50
+    amount: env.REGISTRATION_FEE_PESEWAS, // e.g. 5000 pesewas = GHS 50
     currency: 'GHS',
     reference,
     callback_url: `${env.FRONTEND_URL}/applicant/payment/verify`,
@@ -335,13 +335,13 @@ async function handleSubscriptionPaymentSuccess(paymentId: string, mediaHouseId:
   if (!payment) return;
 
   const tierMap: Record<number, string> = {
-    50000: 'BASIC',    // GHC 500 → 50000 kobo
-    100000: 'PREMIUM', // GHC 1000
+    50000: 'BASIC', // GHS 500 → 50000 pesewas
+    100000: 'PREMIUM',
     200000: 'ENTERPRISE',
   };
 
-  const koboAmount = Math.round(payment.amount.toNumber() * 100);
-  const tier = tierMap[koboAmount] || 'BASIC';
+  const amountPesewas = Math.round(payment.amount.toNumber() * 100);
+  const tier = tierMap[amountPesewas] || 'BASIC';
   const expiry = new Date();
   expiry.setMonth(expiry.getMonth() + 1);
 
@@ -374,7 +374,7 @@ export async function initiateRevenueSharePayment(userId: string, placementId: s
 
   const paystackData = await paystackPost('/transaction/initialize', {
     email: user.email,
-    amount: Math.round(amount * 100), // kobo
+    amount: Math.round(amount * 100), // GHS pesewas (×100)
     currency: 'GHS',
     reference,
     callback_url: `${env.FRONTEND_URL}/applicant/payments/verify`,
@@ -458,7 +458,7 @@ export async function verifyPaymentByReference(userId: string, reference: string
 
   return {
     status: paymentData.status,
-    amount: paymentData.amount / 100, // convert kobo to GHC
+    amount: paymentData.amount / 100, // Paystack amount is pesewas → GHS
     channel: paymentData.channel,
     paidAt: paymentData.paid_at,
     payment: { id: payment.id, type: payment.type, status: payment.status },
@@ -480,17 +480,17 @@ export async function initiateSubscription(
   if (!user || !user.mediaHouse) throw new AppError('Media house not found', 404);
 
   const tierPrices: Record<string, number> = {
-    BASIC: 50000,      // GHC 500 in kobo
-    PREMIUM: 100000,   // GHC 1000 in kobo
-    ENTERPRISE: 200000, // GHC 2000 in kobo
+    BASIC: 50000, // GHS 500 in pesewas
+    PREMIUM: 100000,
+    ENTERPRISE: 200000,
   };
 
-  const amountKobo = tierPrices[tier];
+  const amountPesewas = tierPrices[tier];
   const reference = `ML-SUB-${user.mediaHouse.id.substring(0, 8)}-${Date.now()}`;
 
   const paystackData = await paystackPost('/transaction/initialize', {
     email: user.email,
-    amount: amountKobo,
+    amount: amountPesewas,
     currency: 'GHS',
     reference,
     callback_url: `${env.FRONTEND_URL}/employer/billing/verify`,
@@ -508,7 +508,7 @@ export async function initiateSubscription(
       payerId: userId,
       mediaHouseId: user.mediaHouse.id,
       type: 'SUBSCRIPTION',
-      amount: amountKobo / 100,
+      amount: amountPesewas / 100,
       gatewayRef: reference,
       status: 'PENDING',
       gateway: 'PAYSTACK',
@@ -520,7 +520,7 @@ export async function initiateSubscription(
     authorizationUrl: paystackData.data.authorization_url,
     reference,
     tier,
-    amount: amountKobo / 100,
+    amount: amountPesewas / 100,
   };
 }
 
@@ -537,13 +537,13 @@ export async function initiateJobBoost(userId: string, jobId: string, boostDays:
   });
   if (!job) throw new AppError('Job listing not found', 404);
 
-  const priceMap: Record<number, number> = { 7: 10000, 14: 25000, 30: 50000 }; // GHC 100, 250, 500
-  const amountKobo = priceMap[boostDays];
+  const priceMap: Record<number, number> = { 7: 10000, 14: 25000, 30: 50000 }; // GHS 100, 250, 500 in pesewas
+  const amountPesewas = priceMap[boostDays];
   const reference = `ML-BOOST-${jobId.substring(0, 8)}-${Date.now()}`;
 
   const paystackData = await paystackPost('/transaction/initialize', {
     email: user.email,
-    amount: amountKobo,
+    amount: amountPesewas,
     currency: 'GHS',
     reference,
     metadata: { userId, jobId, type: 'JOB_BOOST', boostDays },
@@ -554,7 +554,7 @@ export async function initiateJobBoost(userId: string, jobId: string, boostDays:
       payerId: userId,
       mediaHouseId: user.mediaHouse.id,
       type: 'JOB_BOOST',
-      amount: amountKobo / 100,
+      amount: amountPesewas / 100,
       gatewayRef: reference,
       status: 'PENDING',
       gateway: 'PAYSTACK',
@@ -562,5 +562,5 @@ export async function initiateJobBoost(userId: string, jobId: string, boostDays:
     },
   });
 
-  return { authorizationUrl: paystackData.data.authorization_url, reference, amount: amountKobo / 100 };
+  return { authorizationUrl: paystackData.data.authorization_url, reference, amount: amountPesewas / 100 };
 }

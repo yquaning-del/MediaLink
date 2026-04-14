@@ -25,7 +25,7 @@ export default function PrivacyPage() {
         <ul>
           <li>Match applicants with relevant job listings using our AI-powered matching engine</li>
           <li>Process payments via Paystack (registration fees, revenue share, subscriptions)</li>
-          <li>Send notifications via SMS (Arkesel) and email (SendGrid) about applications, placements, and payments</li>
+          <li>Send notifications via SMS (Twilio) and email (SendGrid) about applications, placements, and payments</li>
           <li>Improve our platform through analytics and usage patterns</li>
           <li>Comply with legal obligations under the Ghana Data Protection Act, 2012 (Act 843)</li>
         </ul>

@@ -9,7 +9,7 @@ declare global {
 export interface PaystackOptions {
   key: string;
   email: string;
-  amount: number; // in kobo (GHC × 100)
+  amount: number; // GHS pesewas (GHS × 100) for Paystack
   currency?: string;
   ref?: string;
   label?: string;

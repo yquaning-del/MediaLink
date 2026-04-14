@@ -1,5 +1,6 @@
 import axios from 'axios';
 import sgMail from '@sendgrid/mail';
+import twilio from 'twilio';
 import { env } from '../../config/env';
 import { prisma } from '../../config/database';
 import { toInternationalFormat } from '../../utils/phoneFormat';
@@ -8,25 +9,23 @@ import { NotifChannel } from '@prisma/client';
 
 sgMail.setApiKey(env.SENDGRID_API_KEY);
 
+const twilioClient = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
+
 // ─────────────────────────────────────────────
-// SMS via Arkesel (Ghana)
+// SMS via Twilio
 // ─────────────────────────────────────────────
 
 export async function sendSms(to: string, message: string): Promise<void> {
   const intlNumber = toInternationalFormat(to);
   try {
-    await axios.get('https://sms.arkesel.com/sms/api', {
-      params: {
-        action: 'send-sms',
-        api_key: env.ARKESEL_API_KEY,
-        to: intlNumber,
-        from: env.ARKESEL_SENDER_ID,
-        sms: message,
-      },
+    await twilioClient.messages.create({
+      body: message,
+      from: env.TWILIO_PHONE_NUMBER,
+      to: intlNumber,
     });
     logger.debug(`SMS sent to ${intlNumber}`);
   } catch (err) {
-    logger.error('Arkesel SMS failed', { to: intlNumber, err });
+    logger.error('Twilio SMS failed', { to: intlNumber, err });
     throw err;
   }
 }
