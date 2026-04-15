@@ -134,7 +134,10 @@ jobs:
     name: Docker — Build & Push
     runs-on: ubuntu-latest
     needs: [backend-lint-test, frontend-lint-build]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: >
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' &&
+      secrets.DOCKERHUB_USERNAME != ''
 
     steps:
       - uses: actions/checkout@v4
