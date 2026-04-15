@@ -86,6 +86,9 @@ importers:
       pdfkit:
         specifier: ^0.15.0
         version: 0.15.2
+      prisma:
+        specifier: ^5.15.0
+        version: 5.22.0
       qrcode:
         specifier: ^1.5.3
         version: 1.5.4
@@ -177,9 +180,6 @@ importers:
       jest:
         specifier: ^29.7.0
         version: 29.7.0(@types/node@20.19.39)(ts-node@10.9.2(@types/node@20.19.39)(typescript@5.9.3))
-      prisma:
-        specifier: ^5.15.0
-        version: 5.22.0
       supertest:
         specifier: ^7.0.0
         version: 7.2.2
