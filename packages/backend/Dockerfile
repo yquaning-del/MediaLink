@@ -3,32 +3,44 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package file and install all deps (including devDeps for tsc)
-COPY package.json ./
-RUN npm install
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy source
-COPY . .
+# Copy workspace files including lockfile
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/backend/package.json ./packages/backend/
+
+# Install all deps (including devDeps for tsc)
+RUN pnpm install --frozen-lockfile
+
+# Copy backend source
+COPY packages/backend ./packages/backend
 
 # Generate Prisma client
-RUN npx prisma generate
+RUN pnpm --filter backend exec prisma generate
 
 # Compile TypeScript
-RUN npm run build
+RUN pnpm --filter backend build
 
 # ── Production stage ────────────────────────────────────────────
 FROM node:20-alpine AS runner
 
 WORKDIR /app
 
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Copy workspace files including lockfile
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/backend/package.json ./packages/backend/
+
 # Install production deps only
-COPY package.json ./
-RUN npm install --omit=dev
+RUN pnpm install --frozen-lockfile --prod
 
 # Copy compiled output + Prisma artifacts
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY prisma ./prisma
+COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
+COPY --from=builder /app/packages/backend/node_modules/.prisma ./packages/backend/node_modules/.prisma
+COPY packages/backend/prisma ./packages/backend/prisma
+
+WORKDIR /app/packages/backend
 
 # Create non-root user
 RUN addgroup -S medialink && adduser -S medialink -G medialink
