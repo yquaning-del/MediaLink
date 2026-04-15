@@ -14,8 +14,10 @@ async function bootstrap(): Promise<void> {
     // Connect to database
     await connectDatabase();
 
-    // Connect to Redis
-    await redis.connect();
+    // Connect to Redis (BullMQ may have already triggered the connection)
+    if (redis.status === 'wait') {
+      await redis.connect();
+    }
 
     // Start BullMQ workers
     startMatchingWorker();

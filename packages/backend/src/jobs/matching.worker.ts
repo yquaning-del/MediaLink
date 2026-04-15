@@ -1,5 +1,5 @@
 import { Queue, Worker, Job } from 'bullmq';
-import { redis } from '../config/redis';
+import { redis, workerRedis } from '../config/redis';
 import { prisma } from '../config/database';
 import { calculateMatchScore, isMatchAboveThreshold } from '../utils/matchScore';
 import { notify, jobMatchAlertEmail } from '../modules/notifications/notification.service';
@@ -32,7 +32,7 @@ export function startMatchingWorker(): Worker {
         await processJobMatching(job.data.jobId as string);
       }
     },
-    { connection: redis, concurrency: 3 }
+    { connection: workerRedis, concurrency: 3 }
   );
 
   worker.on('completed', (job) => logger.debug(`Matching job ${job.id} completed`));

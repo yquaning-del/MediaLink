@@ -1,5 +1,5 @@
 import { Queue, Worker, Job } from 'bullmq';
-import { redis } from '../config/redis';
+import { redis, workerRedis } from '../config/redis';
 import { prisma } from '../config/database';
 import { notify, revenueShareDueEmail } from '../modules/notifications/notification.service';
 import { env } from '../config/env';
@@ -34,7 +34,7 @@ export function startRevenueShareWorker(): Worker {
         await sendOverdueReminders();
       }
     },
-    { connection: redis, concurrency: 2 }
+    { connection: workerRedis, concurrency: 2 }
   );
 
   worker.on('completed', (job) => logger.debug(`Revenue share job ${job.id} completed`));

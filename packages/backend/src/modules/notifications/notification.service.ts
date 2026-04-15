@@ -8,7 +8,16 @@ import { NotifChannel, Prisma } from '@prisma/client';
 
 sgMail.setApiKey(env.SENDGRID_API_KEY);
 
-const twilioClient = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
+let _twilioClient: ReturnType<typeof twilio> | null = null;
+function getTwilioClient() {
+  if (!_twilioClient) {
+    if (!env.TWILIO_ACCOUNT_SID.startsWith('AC')) {
+      throw new Error('Twilio not configured: TWILIO_ACCOUNT_SID must start with AC');
+    }
+    _twilioClient = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
+  }
+  return _twilioClient;
+}
 
 // ─────────────────────────────────────────────
 // SMS via Twilio
@@ -17,15 +26,14 @@ const twilioClient = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
 export async function sendSms(to: string, message: string): Promise<void> {
   const intlNumber = toInternationalFormat(to);
   try {
-    await twilioClient.messages.create({
+    await getTwilioClient().messages.create({
       body: message,
       from: env.TWILIO_PHONE_NUMBER,
       to: intlNumber,
     });
     logger.debug(`SMS sent to ${intlNumber}`);
   } catch (err) {
-    logger.error('Twilio SMS failed', { to: intlNumber, err });
-    throw err;
+    logger.warn('SMS skipped (Twilio not configured or send failed)', { to: intlNumber, err });
   }
 }
 

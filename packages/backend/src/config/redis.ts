@@ -6,6 +6,12 @@ export const redis = new Redis(env.REDIS_URL, {
   lazyConnect: true,
 });
 
+// BullMQ Workers require maxRetriesPerRequest: null for blocking commands (BLPOP)
+export const workerRedis = new Redis(env.REDIS_URL, {
+  maxRetriesPerRequest: null,
+  lazyConnect: true,
+});
+
 redis.on('error', (err) => {
   console.error('Redis error:', err.message);
 });
