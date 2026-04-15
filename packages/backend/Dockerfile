@@ -35,10 +35,12 @@ COPY packages/backend/package.json ./packages/backend/
 # Install production deps only
 RUN pnpm install --frozen-lockfile --prod
 
-# Copy compiled output + Prisma artifacts
-COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
-COPY --from=builder /app/packages/backend/node_modules/.prisma ./packages/backend/node_modules/.prisma
+# Copy prisma schema and generate client against production deps
 COPY packages/backend/prisma ./packages/backend/prisma
+RUN pnpm --filter backend exec prisma generate
+
+# Copy compiled output
+COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
 
 WORKDIR /app/packages/backend
 
