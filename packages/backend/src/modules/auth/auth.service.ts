@@ -90,7 +90,11 @@ export async function registerApplicant(data: {
 
   await writeAuditLog({ userId: user.id, action: 'REGISTER', entity: 'User', entityId: user.id });
 
-  return { userId: user.id, message: 'OTP sent to your phone number. Please verify to continue.' };
+  return {
+    userId: user.id,
+    message: 'OTP sent to your phone number. Please verify to continue.',
+    ...(env.NODE_ENV !== 'production' && { devOtp: otp }),
+  };
 }
 
 // ─────────────────────────────────────────────
@@ -151,7 +155,11 @@ export async function registerEmployer(data: {
 
   await writeAuditLog({ userId: user.id, action: 'REGISTER_EMPLOYER', entity: 'User', entityId: user.id });
 
-  return { userId: user.id, message: 'OTP sent. Please verify your phone number.' };
+  return {
+    userId: user.id,
+    message: 'OTP sent. Please verify your phone number.',
+    ...(env.NODE_ENV !== 'production' && { devOtp: otp }),
+  };
 }
 
 // ─────────────────────────────────────────────
@@ -200,7 +208,10 @@ export async function resendOtp(phone: string) {
   await setOtp(phone, otp);
   await sendSms(phone, `MediaLink Ghana: Your new verification code is ${otp}. Valid for 10 minutes.`);
 
-  return { message: 'OTP resent successfully.' };
+  return {
+    message: 'OTP resent successfully.',
+    ...(env.NODE_ENV !== 'production' && { devOtp: otp }),
+  };
 }
 
 // ─────────────────────────────────────────────

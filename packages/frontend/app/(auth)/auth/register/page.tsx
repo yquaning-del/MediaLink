@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToastStore } from '@/lib/store';
-import api, { extractError } from '@/lib/api';
+import api, { extractError, ApiResponse } from '@/lib/api';
 import { Building2, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +26,7 @@ const schema = z.object({
   companyName: z.string().optional(),
   registrationNumber: z.string().optional(),
   industryType: z.enum(['TV', 'RADIO', 'DIGITAL', 'PRINT', 'OUTDOOR']).optional(),
+  address: z.string().optional(),
 }).refine((d) => d.password === d.confirmPassword, { message: 'Passwords do not match', path: ['confirmPassword'] });
 
 type FormData = z.infer<typeof schema>;
@@ -46,14 +47,31 @@ export default function RegisterPage() {
     try {
       const endpoint = role === 'applicant' ? '/auth/register/applicant' : '/auth/register/employer';
       const payload = role === 'applicant'
-        ? { email: data.email, phone: data.phone, password: data.password, fullName: data.fullName }
-        : { email: data.email, phone: data.phone, password: data.password, companyName: data.companyName, registrationNumber: data.registrationNumber, industryType: data.industryType };
+        ? {
+            email: data.email,
+            phone: data.phone,
+            password: data.password,
+            confirmPassword: data.confirmPassword ?? '',
+            fullName: data.fullName ?? '',
+          }
+        : {
+            email: data.email,
+            phone: data.phone,
+            password: data.password,
+            confirmPassword: data.confirmPassword ?? '',
+            companyName: data.companyName ?? '',
+            registrationNumber: data.registrationNumber ?? '',
+            industryType: data.industryType,
+            contactName: data.companyName ?? '',
+            address: data.address ?? '',
+          };
 
-      await api.post(endpoint, payload);
+      const { data: res } = await api.post<ApiResponse<{ userId: string; devOtp?: string }>>(endpoint, payload);
 
       // Store phone for OTP page
       sessionStorage.setItem('otpPhone', data.phone);
       sessionStorage.setItem('otpRole', role);
+      if (res.data?.devOtp) sessionStorage.setItem('devOtp', res.data.devOtp);
 
       addToast({ type: 'success', title: 'Registration successful!', description: 'We sent a 6-digit OTP to your phone.' });
       router.push('/auth/verify-otp');
@@ -109,6 +127,11 @@ export default function RegisterPage() {
                 <Label htmlFor="registrationNumber">Company Registration Number</Label>
                 <Input id="registrationNumber" placeholder="CS-XXXXXXXX" {...register('registrationNumber')} className="mt-1" />
                 {errors.registrationNumber && <p className="text-destructive text-xs mt-1">{errors.registrationNumber.message}</p>}
+              </div>
+              <div>
+                <Label htmlFor="address">Company Address</Label>
+                <Input id="address" placeholder="123 Independence Ave, Accra" {...register('address')} className="mt-1" />
+                {errors.address && <p className="text-destructive text-xs mt-1">{errors.address.message}</p>}
               </div>
               <div>
                 <Label htmlFor="industryType">Industry Type</Label>

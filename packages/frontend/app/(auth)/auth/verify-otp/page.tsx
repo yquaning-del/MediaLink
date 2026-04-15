@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToastStore } from '@/lib/store';
-import api, { extractError } from '@/lib/api';
+import api, { extractError, ApiResponse } from '@/lib/api';
 
 export default function VerifyOtpPage() {
   const router = useRouter();
@@ -15,10 +15,18 @@ export default function VerifyOtpPage() {
   const [resendCooldown, setResendCooldown] = useState(60);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  const [devMode, setDevMode] = useState(false);
   const phone = typeof window !== 'undefined' ? sessionStorage.getItem('otpPhone') ?? '' : '';
 
   useEffect(() => {
-    inputRefs.current[0]?.focus();
+    const devOtp = sessionStorage.getItem('devOtp');
+    if (devOtp && devOtp.length === 6) {
+      setOtp(devOtp.split(''));
+      setDevMode(true);
+      sessionStorage.removeItem('devOtp');
+    } else {
+      inputRefs.current[0]?.focus();
+    }
   }, []);
 
   useEffect(() => {
@@ -59,6 +67,7 @@ export default function VerifyOtpPage() {
       const role = sessionStorage.getItem('otpRole');
       sessionStorage.removeItem('otpPhone');
       sessionStorage.removeItem('otpRole');
+      sessionStorage.removeItem('devOtp');
 
       // Applicants go to payment; employers go to login (pending KYB)
       if (role === 'applicant') {
@@ -75,9 +84,15 @@ export default function VerifyOtpPage() {
 
   const handleResend = async () => {
     try {
-      await api.post('/auth/resend-otp', { phone });
+      const { data: res } = await api.post<ApiResponse<{ devOtp?: string }>>('/auth/resend-otp', { phone });
       setResendCooldown(60);
-      addToast({ type: 'info', title: 'OTP resent', description: 'Check your phone for the new code.' });
+      if (res.data?.devOtp && res.data.devOtp.length === 6) {
+        setOtp(res.data.devOtp.split(''));
+        setDevMode(true);
+        addToast({ type: 'info', title: 'OTP resent', description: 'Development mode: OTP pre-filled.' });
+      } else {
+        addToast({ type: 'info', title: 'OTP resent', description: 'Check your phone for the new code.' });
+      }
     } catch (err) {
       addToast({ type: 'error', title: 'Failed to resend', description: extractError(err) });
     }
@@ -92,6 +107,11 @@ export default function VerifyOtpPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {devMode && (
+          <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <strong>Development mode</strong> — OTP pre-filled. SMS was not sent (Twilio not configured).
+          </div>
+        )}
         <div className="flex justify-center gap-3 mb-8" onPaste={handlePaste}>
           {otp.map((digit, i) => (
             <input

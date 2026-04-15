@@ -95,7 +95,10 @@ export interface ApiResponse<T> {
 
 export function extractError(err: unknown): string {
   if (err instanceof AxiosError) {
-    const msg = err.response?.data?.message;
+    if (!err.response) {
+      return 'Unable to reach the server. Please check your internet connection or try again.';
+    }
+    const msg = err.response.data?.message;
     if (typeof msg === 'string') return msg;
     if (Array.isArray(msg)) return msg.join(', ');
   }
