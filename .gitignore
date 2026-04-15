@@ -12,3 +12,5 @@ coverage
 prisma/migrations/*.sql.bak
 .pnpm-store
 .vercel
+package-lock.json
+**/package-lock.json
