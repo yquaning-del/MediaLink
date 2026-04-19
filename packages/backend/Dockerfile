@@ -26,6 +26,9 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
+# OpenSSL is required by Prisma engines on Alpine
+RUN apk add --no-cache openssl
+
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Copy workspace files including lockfile
@@ -44,8 +47,10 @@ COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
 
 WORKDIR /app/packages/backend
 
-# Create non-root user
-RUN addgroup -S medialink && adduser -S medialink -G medialink
+# Create non-root user and give it ownership of the app directory
+RUN addgroup -S medialink && adduser -S medialink -G medialink \
+    && chown -R medialink:medialink /app
+
 USER medialink
 
 EXPOSE 4000
