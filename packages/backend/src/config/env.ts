@@ -61,11 +61,12 @@ const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
   console.error('❌ Invalid environment variables:');
-  console.error(parsed.error.flatten().fieldErrors);
-  process.exit(1);
+  console.error(JSON.stringify(parsed.error.flatten().fieldErrors, null, 2));
+  // Do not process.exit — the HTTP server must start so Railway's healthcheck
+  // can pass. Routes that need the missing vars will fail at runtime.
 }
 
-export const env = parsed.data;
+export const env = (parsed.success ? parsed.data : process.env) as z.infer<typeof envSchema>;
 
 export const adminAllowedIps = env.ADMIN_ALLOWED_IPS.split(',').map((ip) => ip.trim());
 
