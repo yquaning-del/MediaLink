@@ -16,7 +16,7 @@ import { generalRateLimiter } from './middleware/rateLimiter.middleware';
 import { notFoundHandler, globalErrorHandler } from './middleware/error.middleware';
 import { logger } from './config/logger';
 
-const pkg = JSON.parse(readFileSync(resolve(__dirname, '../package.json'), 'utf-8'));
+const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
 
 // Route imports
 import authRoutes from './modules/auth/auth.routes';
